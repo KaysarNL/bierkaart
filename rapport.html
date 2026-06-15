@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🍺 Bierrapport – Kaysar's Kelder</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f0f0f;
+      color: #f0e6c8;
+      font-family: Arial, sans-serif;
+      padding: 2rem 1rem 4rem;
+    }
+    h1 {
+      font-family: Georgia, serif;
+      color: #c8952a;
+      font-size: 1.6rem;
+      margin-bottom: 0.3rem;
+    }
+    .sub { color: #7a6a4a; font-size: 0.88rem; margin-bottom: 1.5rem; }
+
+    .dag-blok {
+      background: #161616;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      margin-bottom: 1.25rem;
+      overflow: hidden;
+    }
+    .dag-header {
+      background: #1f1a10;
+      border-bottom: 1px solid #2a2a2a;
+      padding: 0.7rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .dag-header strong { color: #c8952a; font-size: 0.95rem; }
+    .dag-header span   { color: #7a6a4a; font-size: 0.82rem; }
+
+    .bestelling {
+      display: flex;
+      align-items: center;
+      padding: 0.65rem 1rem;
+      border-bottom: 1px solid #1a1a1a;
+      gap: 0.75rem;
+    }
+    .bestelling:last-child { border-bottom: none; }
+    .bier-naam  { flex: 1; font-size: 0.95rem; color: #f0e6c8; }
+    .gast-naam  { color: #c8952a; font-size: 0.85rem; min-width: 80px; text-align: right; }
+    .tijdstip   { color: #5a4a2a; font-size: 0.78rem; min-width: 48px; text-align: right; font-family: monospace; }
+    .bericht-row {
+      padding: 0.55rem 1rem;
+      border-bottom: 1px solid #1a1a1a;
+      color: #5a5a5a;
+      font-size: 0.82rem;
+      font-style: italic;
+    }
+    .bericht-row:last-child { border-bottom: none; }
+
+    /* Samenvatting */
+    .samenvatting {
+      background: #1f1a10;
+      border: 1px solid #c8952a44;
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .stat { text-align: center; }
+    .stat .getal { font-size: 2rem; font-weight: bold; color: #c8952a; font-family: Georgia, serif; }
+    .stat .label { font-size: 0.75rem; color: #7a6a4a; text-transform: uppercase; letter-spacing: 0.06em; }
+
+    /* Populair bier */
+    .populair {
+      background: #0f2010;
+      border: 1px solid #2a5a30;
+      border-radius: 8px;
+      padding: 0.6rem 1rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.88rem;
+      color: #5aaa6a;
+    }
+
+    #laden { color: #7a6a4a; font-style: italic; padding: 2rem 0; }
+    #fout  { color: #e05a2b; padding: 1rem 0; }
+
+    button {
+      background: #c8952a; color: #0f0f0f;
+      border: none; border-radius: 8px;
+      padding: 0.6rem 1.25rem;
+      font-size: 0.9rem; font-weight: bold;
+      cursor: pointer; font-family: Arial, sans-serif;
+      margin-bottom: 1.5rem;
+    }
+    button:hover { filter: brightness(1.1); }
+
+    @media print {
+      body { background: #fff; color: #000; }
+      button { display: none; }
+      .dag-blok  { border: 1px solid #ccc; }
+      .dag-header { background: #f5f0e0; }
+      .dag-header strong { color: #8a6020; }
+      .bier-naam { color: #000; }
+      .gast-naam { color: #8a6020; }
+      .samenvatting { border: 1px solid #ccc; background: #f9f5ec; }
+      .populair { background: #f0f8f0; border: 1px solid #aac; color: #2a6a2a; }
+      .stat .getal { color: #8a6020; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>🍺 Bierrapport – Kaysar's Kelder</h1>
+<p class="sub">Alle bestellingen uit ntfy · <span id="opgehaald-op"></span></p>
+
+<button onclick="laadRapport()">↻ Opnieuw ophalen</button>
+
+<div id="samenvatting-wrap"></div>
+<div id="laden">Bestellingen ophalen...</div>
+<div id="fout" style="display:none"></div>
+<div id="rapport"></div>
+
+<script>
+  const TOPIC = 'kaysar-bierkelder-2026';
+  const BESTEL_RE = /🍺 (.+?) besteld door (.+?) — nog (\d+) over/;
+
+  function formatDatum(d) {
+    return d.toLocaleDateString('nl-NL', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  }
+  function formatTijd(d) {
+    return d.toLocaleTimeString('nl-NL', { hour:'2-digit', minute:'2-digit' });
+  }
+
+  async function laadRapport() {
+    document.getElementById('laden').style.display = 'block';
+    document.getElementById('fout').style.display = 'none';
+    document.getElementById('rapport').innerHTML = '';
+    document.getElementById('samenvatting-wrap').innerHTML = '';
+
+    try {
+      const res = await fetch(`https://ntfy.sh/${TOPIC}/json?poll=1`, {
+        headers: { 'Accept': 'application/x-ndjson' }
+      });
+      const tekst = await res.text();
+      const regels = tekst.trim().split('\n').filter(Boolean);
+      const berichten = regels.map(r => {
+        try { return JSON.parse(r); } catch { return null; }
+      }).filter(Boolean);
+
+      document.getElementById('laden').style.display = 'none';
+      document.getElementById('opgehaald-op').textContent =
+        'opgehaald op ' + new Date().toLocaleString('nl-NL');
+
+      if (!berichten.length) {
+        document.getElementById('rapport').innerHTML =
+          '<p style="color:#5a4a2a;font-style:italic">Geen berichten gevonden in ntfy.</p>';
+        return;
+      }
+
+      // Groepeer op dag
+      const dagenMap = {};
+      let totaalBestellingen = 0;
+      const bierTeller = {};
+
+      berichten.forEach(b => {
+        const d = new Date(b.time * 1000);
+        const dagKey = d.toISOString().slice(0, 10);
+        if (!dagenMap[dagKey]) dagenMap[dagKey] = [];
+        dagenMap[dagKey].push({ ...b, datum: d });
+
+        const match = BESTEL_RE.exec(b.message || '');
+        if (match) {
+          totaalBestellingen++;
+          const bierNaam = match[1];
+          bierTeller[bierNaam] = (bierTeller[bierNaam] || 0) + 1;
+        }
+      });
+
+      // Populairste bier
+      const populairst = Object.entries(bierTeller)
+        .sort((a, b) => b[1] - a[1])[0];
+
+      // Samenvatting
+      const aantalGasten = new Set(
+        berichten.map(b => {
+          const m = BESTEL_RE.exec(b.message || '');
+          return m ? m[2] : null;
+        }).filter(Boolean)
+      ).size;
+
+      const wrap = document.getElementById('samenvatting-wrap');
+      if (totaalBestellingen > 0) {
+        wrap.innerHTML = `
+          <div class="samenvatting">
+            <div class="stat">
+              <div class="getal">${totaalBestellingen}</div>
+              <div class="label">Bestellingen</div>
+            </div>
+            <div class="stat">
+              <div class="getal">${aantalGasten}</div>
+              <div class="label">Gasten</div>
+            </div>
+            <div class="stat">
+              <div class="getal">${Object.keys(bierTeller).length}</div>
+              <div class="label">Soorten bier</div>
+            </div>
+          </div>
+          ${populairst ? `<div class="populair">🏆 Populairste bier: <strong>${populairst[0]}</strong> (${populairst[1]}×)</div>` : ''}
+        `;
+      }
+
+      // Render per dag (nieuwste eerst)
+      const rapport = document.getElementById('rapport');
+      Object.keys(dagenMap).sort().reverse().forEach(dagKey => {
+        const items = dagenMap[dagKey].sort((a, b) => b.time - a.time);
+        const bestellingenVandaag = items.filter(b => BESTEL_RE.test(b.message || '')).length;
+
+        const blok = document.createElement('div');
+        blok.className = 'dag-blok';
+        blok.innerHTML = `
+          <div class="dag-header">
+            <strong>${formatDatum(items[0].datum)}</strong>
+            <span>${bestellingenVandaag} bestelling${bestellingenVandaag !== 1 ? 'en' : ''}</span>
+          </div>
+        `;
+
+        items.forEach(b => {
+          const match = BESTEL_RE.exec(b.message || '');
+          if (match) {
+            const rij = document.createElement('div');
+            rij.className = 'bestelling';
+            rij.innerHTML = `
+              <span class="tijdstip">${formatTijd(b.datum)}</span>
+              <span class="bier-naam">🍺 ${esc(match[1])}</span>
+              <span class="gast-naam">${esc(match[2])}</span>
+            `;
+            blok.appendChild(rij);
+          } else if ((b.title || '').includes('Bericht')) {
+            const rij = document.createElement('div');
+            rij.className = 'bericht-row';
+            rij.textContent = `${formatTijd(b.datum)} 💬 ${b.message || ''}`;
+            blok.appendChild(rij);
+          }
+        });
+
+        rapport.appendChild(blok);
+      });
+
+    } catch (e) {
+      document.getElementById('laden').style.display = 'none';
+      document.getElementById('fout').style.display = 'block';
+      document.getElementById('fout').textContent = 'Ophalen mislukt: ' + e.message;
+    }
+  }
+
+  function esc(str) {
+    return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  laadRapport();
+</script>
+</body>
+</html>
