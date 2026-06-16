@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
   <title>🍺 Bierbeheer</title>
 
   <!-- PWA / iOS home screen -->
@@ -281,11 +281,11 @@
 
     .pin-pad {
       display: grid;
-      grid-template-columns: repeat(3, 72px);
+      grid-template-columns: repeat(3, min(72px, 26vw));
       gap: 12px;
     }
     .pin-key {
-      width: 72px; height: 72px; border-radius: 50%;
+      width: min(72px, 26vw); height: min(72px, 26vw); border-radius: 50%;
       background: #1a1a1a; border: 1px solid #2a2a2a;
       color: #f0e6c8; font-size: 1.5rem; font-weight: bold;
       cursor: pointer; display: flex; align-items: center; justify-content: center;

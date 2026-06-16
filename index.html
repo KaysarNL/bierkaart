@@ -850,12 +850,12 @@
     const laatste = kandidaten[0];
     const min = Math.round((Date.now() - laatste.tijd) / 60000);
     let tijdTekst;
-    if (min < 1)       tijdTekst = 'zojuist';
-    else if (min < 60) tijdTekst = `${min} min geleden`;
-    else {
-      const u = Math.floor(min / 60), m = min % 60;
-      tijdTekst = m > 0 ? `${u}u${m}min geleden` : `${u}u geleden`;
-    }
+    if (min < 1)         tijdTekst = 'zojuist';
+    else if (min < 60)   tijdTekst = `${min} min geleden`;
+    else if (min < 1440) { const u = Math.floor(min / 60), m = min % 60;
+                           tijdTekst = m > 0 ? `${u}u${m}min geleden` : `${u}u geleden`; }
+    else                 { const d = Math.floor(min / 1440), u = Math.floor((min % 1440) / 60);
+                           tijdTekst = u > 0 ? `${d}d${u}u geleden` : `${d}d geleden`; }
     document.getElementById('laatste-tekst').textContent =
       `${laatste.gast} · ${laatste.bier} · ${tijdTekst}`;
     document.getElementById('laatste-bar').style.display = 'block';
